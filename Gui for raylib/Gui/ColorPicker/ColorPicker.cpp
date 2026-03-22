@@ -66,161 +66,181 @@ namespace ColorPickerUtils {
     }
 }
 
-ColorPicker* ColorPicker::activePicker = nullptr;
+ColorPicker* ColorPicker::s_activePicker = nullptr;
 
 bool ColorPicker::IsAnyPickerActive() {
-    return activePicker != nullptr;
+    return s_activePicker != nullptr;
 }
 
 void ColorPicker::CloseAllPickers() {
-    if (activePicker != nullptr) {
-        activePicker->isOpen = false;
-        activePicker = nullptr;
+    if (s_activePicker != nullptr) {
+        s_activePicker->m_isOpen = false;
+        s_activePicker = nullptr;
     }
 }
 
 ColorPicker::ColorPicker(Rectangle bounds, Color color, std::function<void(Color)> onColorChange)
-    : bounds(bounds), currentColor(color), onColorChange(onColorChange), isOpen(false),
-    isDraggingSatVal(false), isDraggingHue(false), isDraggingAlpha(false),
-    isEditing(false), editingComponent(0) {
-    state = COLORPICKER_STATE_NORMAL;
+    : m_bounds(bounds), m_currentColor(color), m_onColorChange(onColorChange), m_isOpen(false),
+    m_isDraggingSatVal(false), m_isDraggingHue(false), m_isDraggingAlpha(false),
+    m_isEditing(false), m_editingComponent(0) {
+    m_state = COLORPICKER_STATE_NORMAL;
 
-    ColorPickerUtils::RGBToHSV(color, hue, saturation, value);
-    alpha = color.a / 255.0f;
+    ColorPickerUtils::RGBToHSV(color, m_hue, m_saturation, m_value);
+    m_alpha = color.a / 255.0f;
 
-    previewColor = {bounds.x, bounds.y, bounds.width, bounds.height};
+    m_previewColor = {bounds.x, bounds.y, bounds.width, bounds.height};
+    FocusManager::Instance().RegisterControl(this);
+}
+
+Rectangle ColorPicker::GetBounds() const {
+    if (m_isOpen) {
+        float pickerWidth = 200.0f;
+        float pickerHeight = 180.0f;
+        float sliderWidth = 15.0f;
+        float inputsHeight = 90.0f;
+        return {
+            m_bounds.x - 5,
+            m_bounds.y - 5,
+            pickerWidth + sliderWidth + 10,
+            pickerHeight + 45 + m_bounds.height + 5
+        };
+    }
+    return m_bounds;
 }
 
 void ColorPicker::Update() {
+    if (!m_isEnabled) return;
+
     Vector2 mousePos = GetMousePosition();
 
     float pickerWidth = 200.0f;
     float pickerHeight = 180.0f;
     float sliderWidth = 15.0f;
-    float pickerX = bounds.x;
-    float pickerY = bounds.y + bounds.height + 5;
-    Rectangle panelBg = {pickerX - 5, pickerY - 5, pickerWidth + sliderWidth + 10, pickerHeight + 45};
+    float pickerX = m_bounds.x;
+    float pickerY = m_bounds.y + m_bounds.height + 5;
+    Rectangle panelBg = {pickerX - 5, pickerY - 5, pickerWidth + sliderWidth + 15, pickerHeight + 45};
 
-    if (isOpen) {
-        if (this != activePicker) {
+    if (m_isOpen) {
+        if (this != s_activePicker) {
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                if (!CheckCollisionPointRec(mousePos, panelBg) && !CheckCollisionPointRec(mousePos, bounds)) {
-                    isOpen = false;
+                if (!CheckCollisionPointRec(mousePos, panelBg) && !CheckCollisionPointRec(mousePos, m_bounds)) {
+                    m_isOpen = false;
                 }
             }
             return;
         }
 
-        satValueArea = {pickerX, pickerY, pickerWidth, pickerHeight};
-        hueSlider = {pickerX + pickerWidth + 5, pickerY, sliderWidth, pickerHeight};
-        alphaSlider = {pickerX, pickerY + pickerHeight + 5, pickerWidth, 12};
+        m_satValueArea = {pickerX, pickerY, pickerWidth, pickerHeight};
+        m_hueSlider = {pickerX + pickerWidth + 5, pickerY, sliderWidth, pickerHeight};
+        m_alphaSlider = {pickerX, pickerY + pickerHeight + 5, pickerWidth, 12};
 
         bool isOverPicker = CheckCollisionPointRec(mousePos, panelBg) ||
-                          CheckCollisionPointRec(mousePos, bounds);
+                          CheckCollisionPointRec(mousePos, m_bounds);
 
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            isDraggingSatVal = CheckCollisionPointRec(mousePos, satValueArea);
-            isDraggingHue = CheckCollisionPointRec(mousePos, hueSlider);
-            isDraggingAlpha = CheckCollisionPointRec(mousePos, alphaSlider);
+            m_isDraggingSatVal = CheckCollisionPointRec(mousePos, m_satValueArea);
+            m_isDraggingHue = CheckCollisionPointRec(mousePos, m_hueSlider);
+            m_isDraggingAlpha = CheckCollisionPointRec(mousePos, m_alphaSlider);
         }
 
         if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
-            isDraggingSatVal = false;
-            isDraggingHue = false;
-            isDraggingAlpha = false;
+            m_isDraggingSatVal = false;
+            m_isDraggingHue = false;
+            m_isDraggingAlpha = false;
         }
 
-        if (isDraggingSatVal) {
-            float localX = (mousePos.x - satValueArea.x) / satValueArea.width;
-            float localY = (mousePos.y - satValueArea.y) / satValueArea.height;
-            saturation = std::max(0.0f, std::min(1.0f, localX));
-            value = std::max(0.0f, std::min(1.0f, 1.0f - localY));
-            currentColor = ColorPickerUtils::HSVToRGB(hue, saturation, value, alpha);
-            if (onColorChange) {
-                onColorChange(currentColor);
+        if (m_isDraggingSatVal) {
+            float localX = (mousePos.x - m_satValueArea.x) / m_satValueArea.width;
+            float localY = (mousePos.y - m_satValueArea.y) / m_satValueArea.height;
+            m_saturation = std::max(0.0f, std::min(1.0f, localX));
+            m_value = std::max(0.0f, std::min(1.0f, 1.0f - localY));
+            m_currentColor = ColorPickerUtils::HSVToRGB(m_hue, m_saturation, m_value, m_alpha);
+            if (m_onColorChange) {
+                m_onColorChange(m_currentColor);
             }
         }
 
-        if (isDraggingHue) {
-            float localY = (mousePos.y - hueSlider.y) / hueSlider.height;
-            hue = std::max(0.0f, std::min(1.0f, localY));
-            currentColor = ColorPickerUtils::HSVToRGB(hue, saturation, value, alpha);
-            if (onColorChange) {
-                onColorChange(currentColor);
+        if (m_isDraggingHue) {
+            float localY = (mousePos.y - m_hueSlider.y) / m_hueSlider.height;
+            m_hue = std::max(0.0f, std::min(1.0f, localY));
+            m_currentColor = ColorPickerUtils::HSVToRGB(m_hue, m_saturation, m_value, m_alpha);
+            if (m_onColorChange) {
+                m_onColorChange(m_currentColor);
             }
         }
 
-        if (isDraggingAlpha) {
-            float localX = (mousePos.x - alphaSlider.x) / alphaSlider.width;
-            alpha = std::max(0.0f, std::min(1.0f, localX));
-            currentColor.a = (unsigned char)(alpha * 255.0f);
-            if (onColorChange) {
-                onColorChange(currentColor);
+        if (m_isDraggingAlpha) {
+            float localX = (mousePos.x - m_alphaSlider.x) / m_alphaSlider.width;
+            m_alpha = std::max(0.0f, std::min(1.0f, localX));
+            m_currentColor.a = (unsigned char)(m_alpha * 255.0f);
+            if (m_onColorChange) {
+                m_onColorChange(m_currentColor);
             }
         }
 
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !isOverPicker && !CheckCollisionPointRec(mousePos, bounds)) {
-            isOpen = false;
-            activePicker = nullptr;
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !isOverPicker && !CheckCollisionPointRec(mousePos, m_bounds)) {
+            m_isOpen = false;
+            s_activePicker = nullptr;
         }
         return;
     }
 
-    bool isHovered = CheckCollisionPointRec(mousePos, bounds);
+    GuiControl* controlAtMouse = FocusManager::Instance().GetControlAtMouse();
+    bool isHoveredByFocus = (controlAtMouse == this);
+    bool isHovered = CheckCollisionPointRec(mousePos, m_bounds) || isHoveredByFocus;
 
-    if (isHovered) {
+    if (isHoveredByFocus) {
         if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
-            state = COLORPICKER_STATE_PRESSED;
+            m_state = COLORPICKER_STATE_PRESSED;
         } else {
-            state = COLORPICKER_STATE_HOVER;
+            m_state = COLORPICKER_STATE_HOVER;
         }
     } else {
-        state = COLORPICKER_STATE_NORMAL;
+        m_state = COLORPICKER_STATE_NORMAL;
     }
 
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && isHovered) {
-        if (activePicker != nullptr && activePicker != this) {
-            activePicker->isOpen = false;
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && isHoveredByFocus) {
+        if (s_activePicker != nullptr && s_activePicker != this) {
+            s_activePicker->m_isOpen = false;
         }
         ComboBox::CloseAllComboBoxes();
         Multiselect::CloseAllMultiselects();
-        isOpen = true;
-        activePicker = this;
+        m_isOpen = true;
+        s_activePicker = this;
     }
 
-    previewColor = {bounds.x, bounds.y, bounds.width, bounds.height};
+    m_previewColor = {m_bounds.x, m_bounds.y, m_bounds.width, m_bounds.height};
 }
 
 void ColorPicker::Draw() {
-    DrawRectangleRec(previewColor, currentColor);
-    DrawRectangleLinesEx(previewColor, 1, borderColor);
+    DrawRectangleRec(m_previewColor, m_currentColor);
+    DrawRectangleLinesEx(m_previewColor, 1, borderColor);
 
-    if (isOpen) {
+    if (m_isOpen) {
         float pickerWidth = 200.0f;
         float pickerHeight = 180.0f;
         float sliderWidth = 15.0f;
-        float inputsHeight = 90.0f;
 
-        float pickerX = bounds.x;
-        float pickerY = bounds.y + bounds.height + 5;
+        float pickerX = m_bounds.x;
+        float pickerY = m_bounds.y + m_bounds.height + 5;
 
-        Rectangle panelBg = {pickerX - 5, pickerY - 5, pickerWidth + sliderWidth + 10, pickerHeight + 45};
+        Rectangle panelBg = {pickerX - 5, pickerY - 5, pickerWidth + sliderWidth + 15, pickerHeight + 45};
         DrawRectangleRec(panelBg, {255, 255, 255, 255});
         DrawRectangleLinesEx(panelBg, 1, borderColor);
 
-        Color hueColor = ColorPickerUtils::HSVToRGB(hue, 1.0f, 1.0f, 1.0f);
+        Color hueColor = ColorPickerUtils::HSVToRGB(m_hue, 1.0f, 1.0f, 1.0f);
         for (int y = 0; y < (int)pickerHeight; y++) {
             float v = 1.0f - (float)y / pickerHeight;
             for (int x = 0; x < (int)pickerWidth; x++) {
                 float s = (float)x / pickerWidth;
-                Color pixelColor = ColorPickerUtils::HSVToRGB(hue, s, v, 1.0f);
+                Color pixelColor = ColorPickerUtils::HSVToRGB(m_hue, s, v, 1.0f);
                 DrawPixel(pickerX + x, pickerY + y, pixelColor);
             }
         }
-        DrawRectangleLinesEx(satValueArea, 1, borderColor);
+        DrawRectangleLinesEx(m_satValueArea, 1, borderColor);
 
-        float satValX = pickerX + saturation * pickerWidth;
-        float satValY = pickerY + (1.0f - value) * pickerHeight;
+        float satValX = pickerX + m_saturation * pickerWidth;
+        float satValY = pickerY + (1.0f - m_value) * pickerHeight;
         DrawCircleLines((int)satValX, (int)satValY, 5, WHITE);
         DrawCircleLines((int)satValX, (int)satValY, 6, BLACK);
 
@@ -228,9 +248,9 @@ void ColorPicker::Draw() {
             float h = (float)y / pickerHeight;
             DrawLineEx({pickerX + pickerWidth + 5, pickerY + y}, {pickerX + pickerWidth + 5 + sliderWidth, pickerY + y}, 1, ColorPickerUtils::GetHueColor(h));
         }
-        DrawRectangleLinesEx(hueSlider, 1, borderColor);
+        DrawRectangleLinesEx(m_hueSlider, 1, borderColor);
 
-        float hueY = pickerY + hue * pickerHeight;
+        float hueY = pickerY + m_hue * pickerHeight;
         DrawRectangleLinesEx({pickerX + pickerWidth + 5 - 1, hueY - 2, sliderWidth + 2, 5}, 1, WHITE);
         DrawRectangleLinesEx({pickerX + pickerWidth + 5 - 2, hueY - 3, sliderWidth + 4, 7}, 1, BLACK);
 
@@ -238,90 +258,90 @@ void ColorPicker::Draw() {
             float a = (float)x / pickerWidth;
             unsigned char alphaVal = (unsigned char)(a * 255.0f);
             DrawLineEx({pickerX + x, pickerY + pickerHeight + 5 + 1}, {pickerX + x, pickerY + pickerHeight + 5 + 11}, 1,
-                {currentColor.r, currentColor.g, currentColor.b, alphaVal});
+                {m_currentColor.r, m_currentColor.g, m_currentColor.b, alphaVal});
         }
-        DrawRectangleLinesEx(alphaSlider, 1, borderColor);
+        DrawRectangleLinesEx(m_alphaSlider, 1, borderColor);
 
-        float alphaX = pickerX + alpha * pickerWidth;
+        float alphaX = pickerX + m_alpha * pickerWidth;
         DrawRectangleLinesEx({alphaX - 2, pickerY + pickerHeight + 5, 4, 13}, 1, WHITE);
         DrawRectangleLinesEx({alphaX - 3, pickerY + pickerHeight + 5 - 1, 6, 15}, 1, BLACK);
 
         char hexBuffer[16];
-        snprintf(hexBuffer, sizeof(hexBuffer), "#%02X%02X%02X", currentColor.r, currentColor.g, currentColor.b);
+        snprintf(hexBuffer, sizeof(hexBuffer), "#%02X%02X%02X", m_currentColor.r, m_currentColor.g, m_currentColor.b);
         DrawText(hexBuffer, pickerX + pickerWidth - 60, pickerY + pickerHeight + 20, 10, BLACK);
 
         char rgbBuffer[32];
-        snprintf(rgbBuffer, sizeof(rgbBuffer), "R:%d G:%d B:%d", currentColor.r, currentColor.g, currentColor.b);
+        snprintf(rgbBuffer, sizeof(rgbBuffer), "R:%d G:%d B:%d", m_currentColor.r, m_currentColor.g, m_currentColor.b);
         DrawText(rgbBuffer, pickerX, pickerY + pickerHeight + 20, 10, BLACK);
     }
 }
 
 void ColorPicker::Draw(std::function<void(Rectangle, Color)> drawRect, std::function<void(Rectangle, Color, float)> drawBorder, std::function<void(Vector2, Vector2, float, Color)> drawLine, std::function<void(const char*, Vector2, float, float, Color)> drawText, std::function<void(Rectangle, float, int, Color)> drawRoundedRect, std::function<void(Vector2, float, int, Color)> drawCircle) {
-    drawRect(previewColor, currentColor);
-    drawBorder(previewColor, borderColor, 1.0f);
+    drawRect(m_previewColor, m_currentColor);
+    drawBorder(m_previewColor, borderColor, 1.0f);
 
-    if (isOpen) {
+    if (m_isOpen) {
         float pickerWidth = 200.0f;
         float pickerHeight = 180.0f;
         float sliderWidth = 15.0f;
 
-        float pickerX = bounds.x;
-        float pickerY = bounds.y + bounds.height + 5;
+        float pickerX = m_bounds.x;
+        float pickerY = m_bounds.y + m_bounds.height + 5;
 
-        satValueArea = {pickerX, pickerY, pickerWidth, pickerHeight};
-        hueSlider = {pickerX + pickerWidth + 5, pickerY, sliderWidth, pickerHeight};
-        alphaSlider = {pickerX, pickerY + pickerHeight + 5, pickerWidth, 12};
+        m_satValueArea = {pickerX, pickerY, pickerWidth, pickerHeight};
+        m_hueSlider = {pickerX + pickerWidth + 5, pickerY, sliderWidth, pickerHeight};
+        m_alphaSlider = {pickerX, pickerY + pickerHeight + 5, pickerWidth, 12};
 
         for (int y = 0; y < (int)pickerHeight; y++) {
             float v = 1.0f - (float)y / pickerHeight;
             for (int x = 0; x < (int)pickerWidth; x++) {
                 float s = (float)x / pickerWidth;
-                Color pixelColor = ColorPickerUtils::HSVToRGB(hue, s, v, 1.0f);
+                Color pixelColor = ColorPickerUtils::HSVToRGB(m_hue, s, v, 1.0f);
                 drawRect({(float)(pickerX + x), (float)(pickerY + y), 1.0f, 1.0f}, pixelColor);
             }
         }
-        drawBorder(satValueArea, borderColor, 1.0f);
+        drawBorder(m_satValueArea, borderColor, 1.0f);
 
         for (int y = 0; y < (int)pickerHeight; y++) {
             float h = (float)y / pickerHeight;
             drawLine({pickerX + pickerWidth + 5, pickerY + y}, {pickerX + pickerWidth + 5 + sliderWidth, pickerY + y}, 1, ColorPickerUtils::GetHueColor(h));
         }
-        drawBorder(hueSlider, borderColor, 1.0f);
+        drawBorder(m_hueSlider, borderColor, 1.0f);
 
         for (int x = 0; x < (int)pickerWidth; x++) {
             float a = (float)x / pickerWidth;
             unsigned char alphaVal = (unsigned char)(a * 255.0f);
             drawLine({pickerX + x, pickerY + pickerHeight + 5 + 1}, {pickerX + x, pickerY + pickerHeight + 5 + 11}, 1,
-                {currentColor.r, currentColor.g, currentColor.b, alphaVal});
+                {m_currentColor.r, m_currentColor.g, m_currentColor.b, alphaVal});
         }
-        drawBorder(alphaSlider, borderColor, 1.0f);
+        drawBorder(m_alphaSlider, borderColor, 1.0f);
 
         char hexBuffer[16];
-        snprintf(hexBuffer, sizeof(hexBuffer), "#%02X%02X%02X", currentColor.r, currentColor.g, currentColor.b);
+        snprintf(hexBuffer, sizeof(hexBuffer), "#%02X%02X%02X", m_currentColor.r, m_currentColor.g, m_currentColor.b);
         drawText(hexBuffer, {pickerX + pickerWidth - 60, (float)(pickerY + pickerHeight + 20)}, 10, 1.0f, BLACK);
     }
 }
 
 Color ColorPicker::GetColor() const {
-    return currentColor;
+    return m_currentColor;
 }
 
 void ColorPicker::SetColor(Color color) {
-    currentColor = color;
-    ColorPickerUtils::RGBToHSV(color, hue, saturation, value);
-    alpha = color.a / 255.0f;
+    m_currentColor = color;
+    ColorPickerUtils::RGBToHSV(color, m_hue, m_saturation, m_value);
+    m_alpha = color.a / 255.0f;
 }
 
 void ColorPicker::SetPosition(float x, float y) {
-    bounds.x = x;
-    bounds.y = y;
+    m_bounds.x = x;
+    m_bounds.y = y;
 }
 
 void ColorPicker::SetSize(float width, float height) {
-    bounds.width = width;
-    bounds.height = height;
+    m_bounds.width = width;
+    m_bounds.height = height;
 }
 
 void ColorPicker::SetOnColorChange(std::function<void(Color)> callback) {
-    onColorChange = callback;
+    m_onColorChange = callback;
 }

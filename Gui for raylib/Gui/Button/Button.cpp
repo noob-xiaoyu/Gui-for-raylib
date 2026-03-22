@@ -1,109 +1,103 @@
 #include "Button.h"
 
 Button::Button(Rectangle bounds, std::string text, std::function<void()> onClick)
-    : bounds(bounds), text(text), onClick(onClick) {
-    state = BUTTON_STATE_NORMAL;
+    : m_bounds(bounds), m_text(text), m_onClick(onClick) {
+    m_state = BUTTON_STATE_NORMAL;
+    FocusManager::Instance().RegisterControl(this);
 }
 
 void Button::SetPos(float x, float y) {
-    bounds.x = x;
-    bounds.y = y;
+    m_bounds.x = x;
+    m_bounds.y = y;
 }
 
 void Button::SetPos(Vector2 pos) {
-    bounds.x = pos.x;
-    bounds.y = pos.y;
+    m_bounds.x = pos.x;
+    m_bounds.y = pos.y;
 }
 
 void Button::SetSize(float width, float height) {
-    bounds.width = width;
-    bounds.height = height;
+    m_bounds.width = width;
+    m_bounds.height = height;
 }
 
 void Button::SetSize(Vector2 size) {
-    bounds.width = size.x;
-    bounds.height = size.y;
+    m_bounds.width = size.x;
+    m_bounds.height = size.y;
+}
+
+Rectangle Button::GetBounds() const {
+    return m_bounds;
 }
 
 Vector2 Button::GetPos() const {
-    return { bounds.x, bounds.y };
+    return { m_bounds.x, m_bounds.y };
 }
 
 Vector2 Button::GetSize() const {
-    return { bounds.width, bounds.height };
+    return { m_bounds.width, m_bounds.height };
 }
 
 void Button::Update() {
+    if (!m_isEnabled) return;
+
     Vector2 mousePos = GetMousePosition();
-    bool isHovered = CheckCollisionPointRec(mousePos, bounds);
+    bool isHovered = CheckCollisionPointRec(mousePos, m_bounds);
 
     if (isHovered) {
         if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
-            state = BUTTON_STATE_PRESSED;
+            m_state = BUTTON_STATE_PRESSED;
         } else {
-            if (state == BUTTON_STATE_PRESSED && onClick) {
-                onClick();
+            if (m_state == BUTTON_STATE_PRESSED && m_onClick) {
+                m_onClick();
             }
-            state = BUTTON_STATE_HOVER;
+            m_state = BUTTON_STATE_HOVER;
         }
     } else {
-        state = BUTTON_STATE_NORMAL;
+        m_state = BUTTON_STATE_NORMAL;
     }
 }
 
 void Button::Draw() {
-    // 确定当前颜色
     Color currentColor = baseColor;
-    if (state == BUTTON_STATE_HOVER) {
+    if (m_state == BUTTON_STATE_HOVER) {
         currentColor = hoverColor;
-    } else if (state == BUTTON_STATE_PRESSED) {
+    } else if (m_state == BUTTON_STATE_PRESSED) {
         currentColor = pressedColor;
     }
-    
-    // 绘制按钮背景
-    DrawRectangleRec(bounds, currentColor);
-    
-    // 绘制按钮文本
-    if (!text.empty()) {
-        Vector2 textSize = MeasureTextEx(GetFontDefault(), text.c_str(), fontSize, 1.0f);
+
+    DrawRectangleRec(m_bounds, currentColor);
+
+    if (!m_text.empty()) {
+        Vector2 textSize = MeasureTextEx(GetFontDefault(), m_text.c_str(), fontSize, 1.0f);
         Vector2 textPos = {
-            bounds.x + (bounds.width - textSize.x) / 2,
-            bounds.y + (bounds.height - textSize.y) / 2
+            m_bounds.x + (m_bounds.width - textSize.x) / 2,
+            m_bounds.y + (m_bounds.height - textSize.y) / 2
         };
-        DrawTextEx(GetFontDefault(), text.c_str(), textPos, fontSize, 1.0f, textColor);
+        DrawTextEx(GetFontDefault(), m_text.c_str(), textPos, fontSize, 1.0f, textColor);
     }
 }
 
 void Button::Draw(std::function<void(Rectangle, Color)> drawRect, std::function<void(Rectangle, Color, float)> drawBorder, std::function<void(const char*, Vector2, float, float, Color)> drawText) {
-    // 确定当前颜色
     Color currentColor = baseColor;
-    if (state == BUTTON_STATE_HOVER) {
+    if (m_state == BUTTON_STATE_HOVER) {
         currentColor = hoverColor;
-    } else if (state == BUTTON_STATE_PRESSED) {
+    } else if (m_state == BUTTON_STATE_PRESSED) {
         currentColor = pressedColor;
     }
-    
-    // 绘制按钮背景
-    drawRect(bounds, currentColor);
-    
-    // 绘制按钮边框
-    drawBorder(bounds, textColor, 2.0f);
-    
-    // 绘制按钮文本
-    if (!text.empty()) {
-        // 假设使用默认字体，计算文本位置
-        float textX = bounds.x + (bounds.width - MeasureText(text.c_str(), fontSize)) / 2;
-        float textY = bounds.y + (bounds.height - fontSize) / 2;
-        drawText(text.c_str(), { textX, textY }, fontSize, 1.0f, textColor);
-    }
-}
 
-Rectangle Button::GetBtn() const {
-    return bounds;
+    drawRect(m_bounds, currentColor);
+    drawBorder(m_bounds, textColor, 2.0f);
+
+    if (!m_text.empty()) {
+        float textX = m_bounds.x + (m_bounds.width - MeasureText(m_text.c_str(), fontSize)) / 2;
+        float textY = m_bounds.y + (m_bounds.height - fontSize) / 2;
+        drawText(m_text.c_str(), { textX, textY }, fontSize, 1.0f, textColor);
+    }
 }
 
 std::string Button::GetText() const {
-    return text;
+    return m_text;
 }
 
 int Button::GetFontSize() const {
@@ -111,9 +105,9 @@ int Button::GetFontSize() const {
 }
 
 bool Button::IsHovered() const {
-    return state == BUTTON_STATE_HOVER;
+    return m_state == BUTTON_STATE_HOVER;
 }
 
 bool Button::IsPressed() const {
-    return state == BUTTON_STATE_PRESSED;
+    return m_state == BUTTON_STATE_PRESSED;
 }

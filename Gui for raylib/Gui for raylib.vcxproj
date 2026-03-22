@@ -139,7 +139,9 @@
     <ClInclude Include="Gui\CheckBox\CheckBox.h" />
     <ClInclude Include="Gui\ColorPicker\ColorPicker.h" />
     <ClInclude Include="Gui\ComboBox\ComboBox.h" />
+    <ClInclude Include="Gui\Focus\FocusManager.h" />
     <ClInclude Include="Gui\Multiselect\Multiselect.h" />
+    <ClInclude Include="Gui\Slider\Slider.h" />
     <ClInclude Include="Gui\TextBox\TextBox.h" />
     <ClInclude Include="include\raylib\raylib.h" />
     <ClInclude Include="include\raylib\raymath.h" />
@@ -152,7 +154,9 @@
     <ClCompile Include="Gui\CheckBox\CheckBox.cpp" />
     <ClCompile Include="Gui\ColorPicker\ColorPicker.cpp" />
     <ClCompile Include="Gui\ComboBox\ComboBox.cpp" />
+    <ClCompile Include="Gui\Focus\FocusManager.cpp" />
     <ClCompile Include="Gui\Multiselect\Multiselect.cpp" />
+    <ClCompile Include="Gui\Slider\Slider.cpp" />
     <ClCompile Include="Gui\TextBox\TextBox.cpp" />
     <ClCompile Include="main\main.cpp" />
     <ClCompile Include="Package\raylib\ray.cpp" />

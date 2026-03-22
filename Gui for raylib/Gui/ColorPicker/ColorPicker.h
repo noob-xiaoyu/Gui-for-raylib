@@ -4,44 +4,45 @@
 #include <string>
 #include <functional>
 #include <vector>
+#include "../Focus/FocusManager.h"
 
 class ComboBox;
 class Multiselect;
 
-class ColorPicker {
+class ColorPicker : public GuiControl {
 private:
-    Rectangle bounds;
-    Color currentColor;
-    bool isOpen;
-    std::function<void(Color)> onColorChange;
+    Rectangle m_bounds;
+    Color m_currentColor;
+    bool m_isOpen;
+    std::function<void(Color)> m_onColorChange;
 
     enum ColorPickerState {
         COLORPICKER_STATE_NORMAL,
         COLORPICKER_STATE_HOVER,
         COLORPICKER_STATE_PRESSED
-    } state;
+    } m_state;
 
-    Rectangle satValueArea;
-    Rectangle hueSlider;
-    Rectangle alphaSlider;
-    Rectangle alphaCheckered;
+    Rectangle m_satValueArea;
+    Rectangle m_hueSlider;
+    Rectangle m_alphaSlider;
+    Rectangle m_alphaCheckered;
 
-    bool isDraggingSatVal;
-    bool isDraggingHue;
-    bool isDraggingAlpha;
+    bool m_isDraggingSatVal;
+    bool m_isDraggingHue;
+    bool m_isDraggingAlpha;
 
-    float hue;
-    float saturation;
-    float value;
-    float alpha;
+    float m_hue;
+    float m_saturation;
+    float m_value;
+    float m_alpha;
 
-    Rectangle previewColor;
-    Rectangle inputsArea;
-    bool isEditing;
-    std::string inputBuffer;
-    int editingComponent;
+    Rectangle m_previewColor;
+    Rectangle m_inputsArea;
+    bool m_isEditing;
+    std::string m_inputBuffer;
+    int m_editingComponent;
 
-    static ColorPicker* activePicker;
+    static ColorPicker* s_activePicker;
 
 public:
     static bool IsAnyPickerActive();
@@ -50,8 +51,9 @@ public:
 public:
     ColorPicker(Rectangle bounds, Color color = RED, std::function<void(Color)> onColorChange = nullptr);
 
-    void Update();
-    void Draw();
+    Rectangle GetBounds() const override;
+    void Update() override;
+    void Draw() override;
     void Draw(std::function<void(Rectangle, Color)> drawRect, std::function<void(Rectangle, Color, float)> drawBorder, std::function<void(Vector2, Vector2, float, Color)> drawLine, std::function<void(const char*, Vector2, float, float, Color)> drawText, std::function<void(Rectangle, float, int, Color)> drawRoundedRect, std::function<void(Vector2, float, int, Color)> drawCircle);
 
     Color GetColor() const;

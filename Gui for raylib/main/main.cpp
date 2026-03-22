@@ -4,96 +4,116 @@
 #include "Gui/ColorPicker/ColorPicker.h"
 #include "Gui/ComboBox/ComboBox.h"
 #include "Gui/Multiselect/Multiselect.h"
+#include "Gui/Slider/Slider.h"
 #include "Gui/TextBox/TextBox.h"
+#include "Gui/Focus/FocusManager.h"
 
 int main() {
-    const int screenWidth = 800;
-    const int screenHeight = 600;
+    const int screenWidth = 1000;
+    const int screenHeight = 700;
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(screenWidth, screenHeight, "GUI Components Test");
 
     SetTargetFPS(240);
 
-    // 创建 Button
-    Button button({100, 100, 150, 50}, "Click Me", []() {
+    Button button({50, 50, 150, 45}, "Click Me", []() {
         TraceLog(LOG_INFO, "Button clicked!");
     });
 
-    // 创建 CheckBox
     bool featureEnabled = false;
-    CheckBox checkBox({100, 200, 20, 20}, "Enable Feature", featureEnabled, [&](bool checked) {
+    CheckBox checkBox({50, 110, 20, 20}, "Enable Feature", featureEnabled, [&](bool checked) {
         featureEnabled = checked;
         TraceLog(LOG_INFO, "CheckBox state: %s", checked ? "checked" : "unchecked");
     });
 
-    // 创建 TextBox
-    TextBox textBox({100, 300, 300, 200});
+    TextBox textBox({50, 160, 300, 150});
     textBox.SetText("Enter text here...");
 
-    // 创建 ComboBox
     std::vector<std::string> comboItems = {"Option 1", "Option 2", "Option 3", "Option 4", "Option 5", "Option 6", "Option 7", "Option 8"};
-    ComboBox comboBox({450, 300, 200, 40}, comboItems, 0, [](int index) {
+    ComboBox comboBox({400, 50, 200, 40}, comboItems, 0, [](int index) {
         TraceLog(LOG_INFO, "ComboBox selected: %d", index);
     });
 
-    // 创建 Multiselect
     std::vector<std::string> multiItems = {"Item 1", "Item 2", "Item 3", "Item 4", "Item 5", "Item 6", "Item 7", "Item 8"};
-    Multiselect multiselect({450, 400, 200, 40}, multiItems, [](const std::vector<int>& indices) {
+    Multiselect multiselect({400, 110, 200, 40}, multiItems, [](const std::vector<int>& indices) {
         TraceLog(LOG_INFO, "Multiselect selected indices:");
         for (int index : indices) {
             TraceLog(LOG_INFO, "%d", index);
         }
     });
 
-    // 创建 ColorPicker
-    ColorPicker colorPicker({800, 400, 60, 40}, RED, [](Color color) {
+    ColorPicker colorPicker({650, 50, 60, 40}, RED, [](Color color) {
         char hex[16];
         snprintf(hex, sizeof(hex), "#%02X%02X%02X", color.r, color.g, color.b);
         TraceLog(LOG_INFO, "ColorPicker: %s", hex);
     });
 
-    // 切换自定义渲染模式
+    float sliderValue = 50.0f;
+    Slider horizontalSlider({400, 280, 250, 30}, 0.0f, 100.0f, sliderValue, Slider::Direction::Horizontal, [&](float value) {
+        sliderValue = value;
+        TraceLog(LOG_INFO, "Horizontal Slider: %.1f", value);
+    });
+
+    float verticalSliderValue = 75.0f;
+    Slider verticalSlider({900, 50, 30, 200}, 0.0f, 100.0f, verticalSliderValue, Slider::Direction::Vertical, [&](float value) {
+        verticalSliderValue = value;
+        TraceLog(LOG_INFO, "Vertical Slider: %.1f", value);
+    });
+
+    int intSliderValue = 50;
+    IntSlider horizontalIntSlider({400, 360, 250, 30}, 0, 100, intSliderValue, IntSlider::Direction::Horizontal, [&](int value) {
+        intSliderValue = value;
+        TraceLog(LOG_INFO, "Horizontal IntSlider: %d", value);
+    });
+
+    int intVerticalSliderValue = 25;
+    IntSlider verticalIntSlider({900, 280, 30, 200}, 0, 100, intVerticalSliderValue, IntSlider::Direction::Vertical, [&](int value) {
+        intVerticalSliderValue = value;
+        TraceLog(LOG_INFO, "Vertical IntSlider: %d", value);
+    });
+
     bool useCustomRender = false;
-    CheckBox customRenderCheckBox({450, 100, 20, 20}, "Use Custom Render", useCustomRender, [&](bool checked) {
+    CheckBox customRenderCheckBox({50, 620, 20, 20}, "Use Custom Render", useCustomRender, [&](bool checked) {
         useCustomRender = checked;
     });
 
     while (!WindowShouldClose()) {
-        // 更新所有组件
+        FocusManager::Instance().Update();
+
         colorPicker.Update();
 
         if (ColorPicker::IsAnyPickerActive()) {
-            button.Update();
-            checkBox.Update();
-        } else {
-            multiselect.Update();
-            comboBox.Update();
+            ComboBox::CloseAllComboBoxes();
+            Multiselect::CloseAllMultiselects();
         }
+
+        multiselect.Update();
+        comboBox.Update();
+        button.Update();
+        checkBox.Update();
         textBox.Update();
         customRenderCheckBox.Update();
+        horizontalSlider.Update();
+        verticalSlider.Update();
+        horizontalIntSlider.Update();
+        verticalIntSlider.Update();
 
         BeginDrawing();
 
         ClearBackground(RAYWHITE);
-        
-        // 绘制标题
-        DrawText("GUI Components Test", 300, 20, 24, DARKGRAY);
-		DrawFPS(700, 20);
 
-        // 绘制组件
+        DrawText("GUI Components Test", 350, 15, 24, DARKGRAY);
+        DrawFPS(900, 15);
+
         if (useCustomRender) {
-            // 使用自定义渲染函数
             button.Draw(
                 [](Rectangle rect, Color color) {
-                    // 绘制圆角按钮
                     DrawRectangleRounded(rect, 0.3f, 8, color);
                 },
                 [](Rectangle rect, Color color, float thickness) {
-                    // 绘制边框
                     DrawRectangleLinesEx(rect, thickness, color);
                 },
                 [](const char* text, Vector2 pos, float fontSize, float spacing, Color color) {
-                    // 绘制带阴影的文字
                     DrawTextEx(GetFontDefault(), text, {pos.x + 1, pos.y + 1}, fontSize, spacing, {0, 0, 0, 100});
                     DrawTextEx(GetFontDefault(), text, pos, fontSize, spacing, color);
                 }
@@ -151,25 +171,25 @@ int main() {
                 }
             );
         } else {
-            // 使用默认渲染
             button.Draw();
             checkBox.Draw();
             textBox.Draw(LIGHTGRAY, BLACK);
             colorPicker.Draw();
         }
 
-        // 绘制自定义渲染选项
-        customRenderCheckBox.Draw();
-        
-        // 显示状态信息
-        DrawText(TextFormat("Button state: %s", button.IsPressed() ? "Pressed" : button.IsHovered() ? "Hovered" : "Normal"), 100, 520, 14, GRAY);
-        DrawText(TextFormat("CheckBox state: %s", checkBox.IsChecked() ? "Checked" : "Unchecked"), 100, 540, 14, GRAY);
-        DrawText(TextFormat("ComboBox selected: %s", comboBox.GetSelectedItem().c_str()), 100, 560, 14, GRAY);
+        DrawText(TextFormat("Button state: %s", button.IsPressed() ? "Pressed" : button.IsHovered() ? "Hovered" : "Normal"), 50, 340, 14, GRAY);
+        DrawText(TextFormat("CheckBox state: %s", checkBox.IsChecked() ? "Checked" : "Unchecked"), 50, 360, 14, GRAY);
+        DrawText(TextFormat("ComboBox selected: %s", comboBox.GetSelectedItem().c_str()), 400, 180, 14, GRAY);
         Color pickerColor = colorPicker.GetColor();
         char hexColor[16];
         snprintf(hexColor, sizeof(hexColor), "#%02X%02X%02X", pickerColor.r, pickerColor.g, pickerColor.b);
-        DrawText(TextFormat("ColorPicker: %s", hexColor), 100, 580, 14, GRAY);
-        DrawText(TextFormat("TextBox text length: %d", textBox.GetText().length()), 450, 520, 14, GRAY);
+        DrawText(TextFormat("ColorPicker: %s", hexColor), 650, 100, 14, GRAY);
+        DrawText(TextFormat("TextBox text length: %d", textBox.GetText().length()), 50, 520, 14, GRAY);
+        DrawText(TextFormat("Horizontal Float Slider: %.1f", sliderValue), 400, 260, 14, GRAY);
+        DrawText(TextFormat("Vertical Float Slider: %.1f", verticalSliderValue), 850, 35, 14, GRAY);
+        DrawText(TextFormat("Horizontal Int Slider: %d", intSliderValue), 400, 340, 14, GRAY);
+        DrawText(TextFormat("Vertical Int Slider: %d", intVerticalSliderValue), 850, 260, 14, GRAY);
+
         std::vector<std::string> selectedItems = multiselect.GetSelectedItems();
         std::string selectedText = "Multiselect selected: ";
         if (selectedItems.empty()) {
@@ -180,17 +200,25 @@ int main() {
                 selectedText += selectedItems[i];
             }
         }
-        DrawText(selectedText.c_str(), 450, 540, 14, GRAY);
-        DrawText(TextFormat("Render mode: %s", useCustomRender ? "Custom" : "Default"), 450, 130, 14, GRAY);
-        
-        // 显示功能状态
+        DrawText(selectedText.c_str(), 400, 160, 14, GRAY);
+        DrawText(TextFormat("Render mode: %s", useCustomRender ? "Custom" : "Default"), 50, 640, 14, GRAY);
+
+        customRenderCheckBox.Draw();
+        horizontalSlider.Draw();
+        verticalSlider.Draw();
+        horizontalIntSlider.Draw();
+        verticalIntSlider.Draw();
+
         if (featureEnabled) {
-            DrawText("Feature is ENABLED", 450, 205, 16, GREEN);
+            DrawText("Feature is ENABLED", 50, 145, 16, GREEN);
         } else {
-            DrawText("Feature is DISABLED", 450, 205, 16, RED);
+            DrawText("Feature is DISABLED", 50, 145, 16, RED);
         }
-        
-        // 最后绘制ComboBox和Multiselect，确保下拉列表在最上层
+
+        if (FocusManager::Instance().HasFocus(&comboBox) || FocusManager::Instance().HasFocus(&multiselect)) {
+        } else {
+        }
+
         if (useCustomRender) {
             multiselect.Draw(
                 [](Rectangle rect, Color color) {

@@ -1,8 +1,7 @@
 #include "ColorPicker.h"
-#include "../ComboBox/ComboBox.h"
-#include "../Multiselect/Multiselect.h"
 #include <algorithm>
 #include <cstdio>
+#include "../Common/GuiSkin.h"
 
 namespace ColorPickerUtils {
     Color HSVToRGB(float h, float s, float v, float a) {
@@ -66,19 +65,6 @@ namespace ColorPickerUtils {
     }
 }
 
-ColorPicker* ColorPicker::s_activePicker = nullptr;
-
-bool ColorPicker::IsAnyPickerActive() {
-    return s_activePicker != nullptr;
-}
-
-void ColorPicker::CloseAllPickers() {
-    if (s_activePicker != nullptr) {
-        s_activePicker->m_isOpen = false;
-        s_activePicker = nullptr;
-    }
-}
-
 ColorPicker::ColorPicker(Rectangle bounds, Color color, std::function<void(Color)> onColorChange)
     : m_bounds(bounds), m_currentColor(color), m_onColorChange(onColorChange), m_isOpen(false),
     m_isDraggingSatVal(false), m_isDraggingHue(false), m_isDraggingAlpha(false),
@@ -109,7 +95,7 @@ Rectangle ColorPicker::GetBounds() const {
 }
 
 void ColorPicker::Update() {
-    if (!m_isEnabled) return;
+    if (!m_isVisible || !m_isEnabled) return;
 
     Vector2 mousePos = GetMousePosition();
 
@@ -121,10 +107,10 @@ void ColorPicker::Update() {
     Rectangle panelBg = {pickerX - 5, pickerY - 5, pickerWidth + sliderWidth + 15, pickerHeight + 45};
 
     if (m_isOpen) {
-        if (this != s_activePicker) {
+        if (!FocusManager::Instance().IsActiveControl(this)) {
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                 if (!CheckCollisionPointRec(mousePos, panelBg) && !CheckCollisionPointRec(mousePos, m_bounds)) {
-                    m_isOpen = false;
+                    Close();
                 }
             }
             return;
@@ -179,17 +165,12 @@ void ColorPicker::Update() {
         }
 
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !isOverPicker && !CheckCollisionPointRec(mousePos, m_bounds)) {
-            m_isOpen = false;
-            s_activePicker = nullptr;
+            Close();
         }
         return;
     }
 
-    GuiControl* controlAtMouse = FocusManager::Instance().GetControlAtMouse();
-    bool isHoveredByFocus = (controlAtMouse == this);
-    bool isHovered = CheckCollisionPointRec(mousePos, m_bounds) || isHoveredByFocus;
-
-    if (isHoveredByFocus) {
+    if (m_isHovered) {
         if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
             m_state = COLORPICKER_STATE_PRESSED;
         } else {
@@ -199,20 +180,85 @@ void ColorPicker::Update() {
         m_state = COLORPICKER_STATE_NORMAL;
     }
 
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && isHoveredByFocus) {
-        if (s_activePicker != nullptr && s_activePicker != this) {
-            s_activePicker->m_isOpen = false;
-        }
-        ComboBox::CloseAllComboBoxes();
-        Multiselect::CloseAllMultiselects();
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && m_isHovered) {
+        FocusManager::Instance().CloseAllActiveControls();
         m_isOpen = true;
-        s_activePicker = this;
+        FocusManager::Instance().SetActiveControl(this);
     }
 
     m_previewColor = {m_bounds.x, m_bounds.y, m_bounds.width, m_bounds.height};
 }
 
+void ColorPicker::Close() {
+    m_isOpen = false;
+    if (FocusManager::Instance().IsActiveControl(this)) {
+        FocusManager::Instance().ClearActiveControl();
+    }
+}
+
 void ColorPicker::Draw() {
+    if (!m_isVisible) return;
+
+    if (m_skin) {
+        PaintContext ctx = { m_bounds, GetState(), m_isFocused };
+        m_skin->DrawColorPicker(ctx, m_currentColor, m_isOpen);
+        
+        if (m_isOpen) {
+            float pickerWidth = 200.0f;
+            float pickerHeight = 180.0f;
+            float sliderWidth = 15.0f;
+            float pickerX = m_bounds.x;
+            float pickerY = m_bounds.y + m_bounds.height + 5;
+            Rectangle panelBg = {pickerX - 5, pickerY - 5, pickerWidth + sliderWidth + 15, pickerHeight + 45};
+            
+            m_skin->DrawColorPickerPanel(ctx, panelBg, m_currentColor, m_hue, m_saturation, m_value);
+            
+            // Still draw the gradient/sliders since they are logic-heavy
+            // but the background is now skinned.
+            for (int y = 0; y < (int)pickerHeight; y++) {
+                float v = 1.0f - (float)y / pickerHeight;
+                for (int x = 0; x < (int)pickerWidth; x++) {
+                    float s = (float)x / pickerWidth;
+                    Color pixelColor = ColorPickerUtils::HSVToRGB(m_hue, s, v, 1.0f);
+                    DrawPixel(pickerX + x, pickerY + y, pixelColor);
+                }
+            }
+            DrawRectangleLinesEx(m_satValueArea, 1, {100, 100, 100, 255});
+            
+            float satValX = pickerX + m_saturation * pickerWidth;
+            float satValY = pickerY + (1.0f - m_value) * pickerHeight;
+            DrawCircleLines((int)satValX, (int)satValY, 5, WHITE);
+            DrawCircleLines((int)satValX, (int)satValY, 6, BLACK);
+
+            for (int y = 0; y < (int)pickerHeight; y++) {
+                float h = (float)y / pickerHeight;
+                DrawLineEx({pickerX + pickerWidth + 5, pickerY + y}, {pickerX + pickerWidth + 5 + sliderWidth, pickerY + y}, 1, ColorPickerUtils::GetHueColor(h));
+            }
+            DrawRectangleLinesEx(m_hueSlider, 1, {100, 100, 100, 255});
+            
+            float hueY = pickerY + m_hue * pickerHeight;
+            DrawRectangleLinesEx({pickerX + pickerWidth + 5 - 1, hueY - 2, sliderWidth + 2, 5}, 1, WHITE);
+            DrawRectangleLinesEx({pickerX + pickerWidth + 5 - 2, hueY - 3, sliderWidth + 4, 7}, 1, BLACK);
+
+            for (int x = 0; x < (int)pickerWidth; x++) {
+                float a = (float)x / pickerWidth;
+                unsigned char alphaVal = (unsigned char)(a * 255.0f);
+                DrawLineEx({pickerX + x, pickerY + pickerHeight + 5 + 1}, {pickerX + x, pickerY + pickerHeight + 5 + 11}, 1,
+                    {m_currentColor.r, m_currentColor.g, m_currentColor.b, alphaVal});
+            }
+            DrawRectangleLinesEx(m_alphaSlider, 1, {100, 100, 100, 255});
+
+            float alphaX = pickerX + m_alpha * pickerWidth;
+            DrawRectangleLinesEx({alphaX - 2, pickerY + pickerHeight + 5, 4, 13}, 1, WHITE);
+            DrawRectangleLinesEx({alphaX - 3, pickerY + pickerHeight + 5 - 1, 6, 15}, 1, BLACK);
+
+            char hexBuffer[16];
+            snprintf(hexBuffer, sizeof(hexBuffer), "#%02X%02X%02X", m_currentColor.r, m_currentColor.g, m_currentColor.b);
+            DrawText(hexBuffer, pickerX + pickerWidth - 60, pickerY + pickerHeight + 20, 10, WHITE);
+        }
+        return;
+    }
+
     DrawRectangleRec(m_previewColor, m_currentColor);
     DrawRectangleLinesEx(m_previewColor, 1, borderColor);
 

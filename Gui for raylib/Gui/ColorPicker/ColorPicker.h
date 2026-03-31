@@ -6,9 +6,6 @@
 #include <vector>
 #include "../Focus/FocusManager.h"
 
-class ComboBox;
-class Multiselect;
-
 class ColorPicker : public GuiControl {
 private:
     Rectangle m_bounds;
@@ -42,12 +39,6 @@ private:
     std::string m_inputBuffer;
     int m_editingComponent;
 
-    static ColorPicker* s_activePicker;
-
-public:
-    static bool IsAnyPickerActive();
-    static void CloseAllPickers();
-
 public:
     ColorPicker(Rectangle bounds, Color color = RED, std::function<void(Color)> onColorChange = nullptr);
 
@@ -61,6 +52,8 @@ public:
     void SetPosition(float x, float y);
     void SetSize(float width, float height);
     void SetOnColorChange(std::function<void(Color)> callback);
+
+    void Close();
 
     Color baseColor = {245, 245, 245, 255};
     Color hoverColor = {230, 230, 230, 255};

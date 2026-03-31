@@ -24,39 +24,39 @@
 
 ## 特性
 
-### 焦点管理系统
-- 统一的 `FocusManager` 单例管理所有控件的焦点
-- 支持控件注册/注销
-- 自动处理鼠标悬停状态
-- 键盘输入支持（Slider 支持方向键调整值）
+### 1. 焦点与交互管理 (FocusManager)
+- **全局调度**：统一管理所有控件的焦点切换、悬停检测和活跃状态。
+- **鼠标捕获 (Mouse Capture)**：按下鼠标时自动锁定操作控件，消除滑动时的悬停穿透，确保拖拽体验丝滑。
+- **活跃控件屏蔽**：当弹出层（如 ComboBox）展开时，自动拦截底层控件的输入，防止操作穿透。
 
-### 自定义渲染
-大多数组件支持通过回调函数自定义渲染：
-- 背景绘制
-- 边框绘制
-- 文本绘制
-- 特殊效果（如圆角矩形、裁剪区域）
+### 2. 主题与样式系统 (GuiTheme)
+- **集中化配置**：通过 `GuiTheme` 单例统一定义全局颜色、字体和间距。
+- **一键换肤**：修改主题配置即可实现全界面风格的同步更新。
 
-### 鼠标交互
-- 悬停检测
-- 点击事件处理
-- 拖动支持
-- 防止误触（拖动时离开控件区域会自动取消）
+### 3. 皮肤系统 (IGuiSkin)
+- **解耦渲染**：引入 `IGuiSkin` 接口，将 UI 逻辑与绘图代码彻底分离。
+- **深度定制**：开发者可以实现自己的皮肤类，为特定控件或全局替换视觉风格（如圆角、渐变、阴影）。
+
+### 4. 健壮的组件库
+- **文本处理**：`TextBox` 支持撤销/重做、光标定位、多行滚动及 IME 输入。
+- **架构复用**：`ComboBox` 与 `Multiselect` 共享 `DropdownControl` 基类逻辑。
 
 ## 项目结构
 
 ```
 Gui for raylib/
 ├── Gui/
+│   ├── Common/           # 核心基类 (DropdownControl), 主题 (GuiTheme), 渲染助手 (GuiRenderer)
 │   ├── Button/           # 按钮组件
 │   ├── CheckBox/         # 复选框组件
 │   ├── ColorPicker/      # 颜色选择器
 │   ├── ComboBox/         # 下拉选择框
-│   ├── Focus/            # 焦点管理系统
+│   ├── Focus/            # 焦点管理系统 (FocusManager)
 │   ├── Multiselect/      # 多选框
 │   ├── Slider/           # 滑块组件 (Slider & IntSlider)
 │   └── TextBox/          # 文本输入框
-├── Package/              # 平台相关代码
+├── gui introduce/        # 详细的组件介绍文档
+├── Package/              # 平台相关代码 (Windows IME 等)
 ├── include/              # raylib 头文件和库
 └── main/                 # 示例程序
 ```
@@ -67,52 +67,44 @@ Gui for raylib/
 
 ```cpp
 #include "Gui/Button/Button.h"
-#include "Gui/Slider/Slider.h"
 #include "Gui/Focus/FocusManager.h"
 
 int main() {
     InitWindow(800, 600, "GUI Test");
-    SetTargetFPS(60);
-
+    
     Button button({100, 100, 150, 50}, "Click Me", []() {
-        TraceLog(LOG_INFO, "Button clicked!");
-    });
-
-    Slider slider({100, 200, 200, 30}, 0.0f, 100.0f, 50.0f, 
-                  Slider::Direction::Horizontal, [](float value) {
-        TraceLog(LOG_INFO, "Slider: %.1f", value);
+        TraceLog(LOG_INFO, "Clicked!");
     });
 
     while (!WindowShouldClose()) {
-        FocusManager::Instance().Update();
+        FocusManager::Instance().Update(); // 必须首先更新管理器
         button.Update();
-        slider.Update();
 
         BeginDrawing();
         ClearBackground(RAYWHITE);
         button.Draw();
-        slider.Draw();
         EndDrawing();
     }
-
     return 0;
 }
 ```
 
-### 自定义渲染示例
+### 皮肤定制示例 (IGuiSkin)
 
 ```cpp
-button.Draw(
-    [](Rectangle rect, Color color) {
-        DrawRectangleRounded(rect, 0.3f, 8, color);
-    },
-    [](Rectangle rect, Color color, float thickness) {
-        DrawRectangleLinesEx(rect, thickness, color);
-    },
-    [](const char* text, Vector2 pos, float fontSize, float spacing, Color color) {
-        DrawTextEx(GetFontDefault(), text, pos, fontSize, spacing, color);
+class MySkin : public IGuiSkin {
+public:
+    void DrawButton(const PaintContext& ctx, const char* text) override {
+        Color c = (ctx.state == ControlState::HOVER) ? SKYBLUE : GRAY;
+        DrawRectangleRounded(ctx.bounds, 0.2f, 8, c);
+        DrawText(text, ctx.bounds.x + 10, ctx.bounds.y + 15, 20, WHITE);
     }
-);
+    // ... 实现其他组件的绘制方法
+};
+
+// 应用皮肤
+MySkin customSkin;
+button.SetSkin(&customSkin);
 ```
 
 ## 编译要求

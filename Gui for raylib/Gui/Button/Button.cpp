@@ -1,8 +1,20 @@
 #include "Button.h"
+#include "../Common/GuiTheme.h"
+#include "../Common/GuiRenderer.h"
+#include "../Common/GuiSkin.h"
 
 Button::Button(Rectangle bounds, std::string text, std::function<void()> onClick)
     : m_bounds(bounds), m_text(text), m_onClick(onClick) {
     m_state = BUTTON_STATE_NORMAL;
+    
+    // Set default colors from theme
+    auto& theme = GuiTheme::Instance();
+    baseColor = theme.colors.background;
+    hoverColor = theme.colors.hover;
+    pressedColor = theme.colors.pressed;
+    textColor = theme.colors.text;
+    fontSize = theme.typography.fontSize;
+
     FocusManager::Instance().RegisterControl(this);
 }
 
@@ -39,12 +51,9 @@ Vector2 Button::GetSize() const {
 }
 
 void Button::Update() {
-    if (!m_isEnabled) return;
+    if (!m_isVisible || !m_isEnabled) return;
 
-    Vector2 mousePos = GetMousePosition();
-    bool isHovered = CheckCollisionPointRec(mousePos, m_bounds);
-
-    if (isHovered) {
+    if (m_isHovered) {
         if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
             m_state = BUTTON_STATE_PRESSED;
         } else {
@@ -59,41 +68,21 @@ void Button::Update() {
 }
 
 void Button::Draw() {
+    if (!m_isVisible) return;
+
+    if (m_skin) {
+        PaintContext ctx = { m_bounds, GetState(), m_isFocused };
+        m_skin->DrawButton(ctx, m_text.c_str());
+        return;
+    }
+
     Color currentColor = baseColor;
-    if (m_state == BUTTON_STATE_HOVER) {
-        currentColor = hoverColor;
-    } else if (m_state == BUTTON_STATE_PRESSED) {
-        currentColor = pressedColor;
-    }
+    if (!m_isEnabled) currentColor = GuiTheme::Instance().colors.disabled;
+    else if (m_state == BUTTON_STATE_HOVER) currentColor = hoverColor;
+    else if (m_state == BUTTON_STATE_PRESSED) currentColor = pressedColor;
 
-    DrawRectangleRec(m_bounds, currentColor);
-
-    if (!m_text.empty()) {
-        Vector2 textSize = MeasureTextEx(GetFontDefault(), m_text.c_str(), fontSize, 1.0f);
-        Vector2 textPos = {
-            m_bounds.x + (m_bounds.width - textSize.x) / 2,
-            m_bounds.y + (m_bounds.height - textSize.y) / 2
-        };
-        DrawTextEx(GetFontDefault(), m_text.c_str(), textPos, fontSize, 1.0f, textColor);
-    }
-}
-
-void Button::Draw(std::function<void(Rectangle, Color)> drawRect, std::function<void(Rectangle, Color, float)> drawBorder, std::function<void(const char*, Vector2, float, float, Color)> drawText) {
-    Color currentColor = baseColor;
-    if (m_state == BUTTON_STATE_HOVER) {
-        currentColor = hoverColor;
-    } else if (m_state == BUTTON_STATE_PRESSED) {
-        currentColor = pressedColor;
-    }
-
-    drawRect(m_bounds, currentColor);
-    drawBorder(m_bounds, textColor, 2.0f);
-
-    if (!m_text.empty()) {
-        float textX = m_bounds.x + (m_bounds.width - MeasureText(m_text.c_str(), fontSize)) / 2;
-        float textY = m_bounds.y + (m_bounds.height - fontSize) / 2;
-        drawText(m_text.c_str(), { textX, textY }, fontSize, 1.0f, textColor);
-    }
+    GuiRenderer::DrawRect(m_bounds, currentColor, true, GuiTheme::Instance().colors.border);
+    GuiRenderer::DrawCenteredText(m_bounds, m_text.c_str(), fontSize, textColor);
 }
 
 std::string Button::GetText() const {

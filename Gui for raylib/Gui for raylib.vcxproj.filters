@@ -51,6 +51,12 @@
     <ClInclude Include="Gui\ColorPicker\ColorPicker.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Gui\Focus\FocusManager.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Gui\Slider\Slider.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main\main.cpp">
@@ -78,6 +84,12 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Gui\ColorPicker\ColorPicker.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Gui\Focus\FocusManager.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Gui\Slider\Slider.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

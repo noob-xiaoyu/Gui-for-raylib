@@ -17,7 +17,6 @@ public:
     Rectangle GetBounds() const override;
     void Update() override;
     void Draw() override;
-    void Draw(std::function<void(Rectangle, Color)> drawRect, std::function<void(Rectangle, Color, float)> drawBorder, std::function<void(const char*, Vector2, float, float, Color)> drawText);
 
     void SetValue(float value);
     float GetValue() const;
@@ -25,7 +24,6 @@ public:
     void SetMaxValue(float maxValue);
 
     void SetFocus(bool focus);
-    bool IsFocused() const;
 
     Color trackColor = LIGHTGRAY;
     Color thumbColor = GRAY;
@@ -48,6 +46,8 @@ private:
     } m_state;
 
     float m_thumbSize;
+    bool m_isInputMode = false;
+    std::string m_inputText = "";
     Rectangle GetThumbBounds() const;
     float ValueToPosition(float value) const;
     float PositionToValue(float position) const;
@@ -67,7 +67,6 @@ public:
     Rectangle GetBounds() const override;
     void Update() override;
     void Draw() override;
-    void Draw(std::function<void(Rectangle, Color)> drawRect, std::function<void(Rectangle, Color, float)> drawBorder, std::function<void(const char*, Vector2, float, float, Color)> drawText);
 
     void SetValue(int value);
     int GetValue() const;
@@ -75,7 +74,6 @@ public:
     void SetMaxValue(int maxValue);
 
     void SetFocus(bool focus);
-    bool IsFocused() const;
 
     Color trackColor = LIGHTGRAY;
     Color thumbColor = GRAY;
@@ -98,6 +96,8 @@ private:
     } m_state;
 
     float m_thumbSize;
+    bool m_isInputMode = false;
+    std::string m_inputText = "";
     Rectangle GetThumbBounds() const;
     float ValueToPosition(float value) const;
     float PositionToValue(float position) const;

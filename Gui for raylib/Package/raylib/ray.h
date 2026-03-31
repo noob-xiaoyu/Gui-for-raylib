@@ -7,4 +7,3 @@ namespace ray
 	void* GetWindowHandle();
 	bool FileExists_(const char* fileName);
 }
-

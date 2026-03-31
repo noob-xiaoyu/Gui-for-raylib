@@ -4,17 +4,11 @@
 #include <string>
 #include <vector>
 #include <functional>
-#include "../Focus/FocusManager.h"
+#include "../Common/DropdownControl.h"
 
-class ComboBox;
-class ColorPicker;
-
-class Multiselect : public GuiControl {
+class Multiselect : public DropdownControl {
 private:
-    Rectangle m_bounds;
-    std::vector<std::string> m_items;
     std::vector<bool> m_selectedItems;
-    bool m_isOpen;
     std::function<void(const std::vector<int>&)> m_onSelectionChange;
 
     enum MultiselectState {
@@ -23,50 +17,20 @@ private:
         MULTISELECT_STATE_PRESSED
     } m_state;
 
-    float m_dropdownHeight;
-    int m_maxVisibleItems;
-    float m_scrollOffset;
-    bool m_isDraggingScroll;
-    float m_scrollbarWidth;
-
-    static Multiselect* s_activeMultiselect;
-
-public:
-    static bool IsAnyMultiselectActive();
-    static void CloseAllMultiselects();
-
 public:
     Multiselect(Rectangle bounds, std::vector<std::string> items, std::function<void(const std::vector<int>&)> onSelectionChange = nullptr);
 
-    Rectangle GetBounds() const override;
     void Update() override;
     void Draw() override;
-    void Draw(std::function<void(Rectangle, Color)> drawRect, std::function<void(Rectangle, Color, float)> drawBorder, std::function<void(Vector2, Vector2, float, Color)> drawLine, std::function<void(const char*, Vector2, float, float, Color)> drawText, std::function<void(Rectangle)> beginScissor, std::function<void()> endScissor, std::function<void(Rectangle, Color)> drawScrollbar);
 
-    void AddItem(const std::string& item);
-    void RemoveItem(int index);
-    void ClearItems();
+    void AddItem(const std::string& item) override;
+    void RemoveItem(int index) override;
+    void ClearItems() override;
 
     std::vector<int> GetSelectedIndices() const;
     std::vector<std::string> GetSelectedItems() const;
     void SetSelectedIndices(const std::vector<int>& indices);
     void SetSelectedItems(const std::vector<std::string>& items);
 
-    void SetPosition(float x, float y);
-    void SetSize(float width, float height);
     void SetOnSelectionChange(std::function<void(const std::vector<int>&)> callback);
-    void SetMaxVisibleItems(int count);
-
-    Rectangle GetDropdownBounds() const;
-
-    Color backgroundColor = WHITE;
-    Color borderColor = GRAY;
-    Color textColor = BLACK;
-    Color hoverColor = LIGHTGRAY;
-    Color pressedColor = DARKGRAY;
-    Color dropdownColor = LIGHTGRAY;
-    Color dropdownBorderColor = GRAY;
-    Color selectedItemColor = WHITE;
-    Color hoverItemColor = WHITE;
-    int fontSize = 16;
 };

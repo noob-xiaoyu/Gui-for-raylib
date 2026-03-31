@@ -4,6 +4,9 @@
 #include <vector>
 #include <algorithm>
 #include "../../Package/win/win.h"
+#include "../Common/GuiTheme.h"
+#include "../Common/GuiRenderer.h"
+#include "../Common/GuiSkin.h"
 
 inline float clamp(float value, float min, float max) {
     if (value < min) return min;
@@ -51,12 +54,13 @@ namespace TextUtils {
 }
 
 TextBox::TextBox(Rectangle bounds)
-    : m_bounds(bounds), m_text(""), m_isFocused(false),
+    : m_bounds(bounds), m_text(""),
     m_cursorIndex(0), m_selectionAnchor(0), m_blinkTimer(0),
     m_isDragging(false), m_scrollOffset({ 0,0 }),
     m_contentHeight(0), m_showScrollbar(false),
     m_isDraggingScroll(false), m_scrollbarWidth(12.0f)
 {
+    m_wantsFocus = true; // TextBox needs keyboard focus
     m_font = GetFontDefault();
     m_fontSize = 20.0f;
     m_spacing = 1.0f;
@@ -102,16 +106,22 @@ void TextBox::SetText(const std::string& text) {
 std::string TextBox::GetText() const { return m_text; }
 
 void TextBox::SetFocus(bool focus) {
-    m_isFocused = focus;
     if (focus) {
         FocusManager::Instance().SetFocusedControl(this);
+    } else if (FocusManager::Instance().GetFocusedControl() == this) {
+        FocusManager::Instance().ClearFocusedControl();
     }
 }
 
 bool TextBox::IsFocused() const { return m_isFocused; }
 
 void TextBox::Update() {
-    if (!m_isEnabled) return;
+    if (!m_isVisible || !m_isEnabled) return;
+
+    // 如果有活跃控件（如弹出框）且不是自己，拦截所有操作
+    if (FocusManager::Instance().HasActiveControl() && !FocusManager::Instance().IsActiveControl(this)) {
+        return;
+    }
 
     HandleScroll();
     HandleMouse();
@@ -246,9 +256,7 @@ void TextBox::HandleMouse() {
     Vector2 mousePos = GetMousePosition();
     Rectangle textArea = GetTextArea();
 
-    bool hover = CheckCollisionPointRec(mousePos, m_bounds);
-
-    if (hover) {
+    if (m_isHovered) {
         SetMouseCursor(MOUSE_CURSOR_IBEAM);
         m_wasHovered = true;
     }
@@ -258,16 +266,12 @@ void TextBox::HandleMouse() {
     }
 
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-        GuiControl* controlAtMouse = FocusManager::Instance().GetControlAtMouse();
-        if (hover && !m_isDraggingScroll && controlAtMouse == this) {
-            m_isFocused = true;
+        if (m_isHovered && !m_isDraggingScroll) {
+            // 注意：FocusManager::Update 已经自动设置了 m_isFocused = true
             m_isDragging = true;
             m_lastCursorIndex = -1;
             m_cursorIndex = GetIndexFromPoint(mousePos);
             m_selectionAnchor = m_cursorIndex;
-        }
-        else if (!hover) {
-            m_isFocused = false;
         }
     }
 
@@ -579,9 +583,27 @@ Rectangle TextBox::GetTextArea() const {
 }
 
 void TextBox::Draw() {
+    if (!m_isVisible) return;
+
+    auto& theme = GuiTheme::Instance();
+    Color bgColor = theme.colors.background;
+    Color textColor = theme.colors.text;
+
+    if (m_skin) {
+        PaintContext ctx = { m_bounds, GetState(), m_isFocused };
+        m_skin->DrawTextBox(ctx, m_text, m_cursorIndex, m_selectionAnchor);
+        
+        // 如果是 DarkSkin，我们自动适配内部文字颜色（后续可从 Skin 获取颜色属性）
+        if (m_skin->GetSkinName() == "DarkSkin") textColor = WHITE; 
+    } else {
+        GuiRenderer::DrawRect(m_bounds, bgColor, true, m_isFocused ? BLUE : DARKGRAY);
+    }
+
+    Draw(BLANK, textColor); // 调用内部逻辑绘制文本、光标、选择区域，背景设为透明
 }
 
 void TextBox::Draw(Color bgcolor, Color textcolor) {
+    if (!m_isVisible) return;
     Rectangle textArea = GetTextArea();
 
     DrawRectangleRec(m_bounds, bgcolor);
@@ -652,83 +674,3 @@ void TextBox::Draw(Color bgcolor, Color textcolor) {
     }
 }
 
-void TextBox::Draw(Color bgcolor, Color textcolor, std::function<void(Rectangle, Color)> drawRect, std::function<void(Vector2, Vector2, float, Color)> drawLine, std::function<void(const char*, Vector2, float, float, Color)> drawText, std::function<void(Rectangle)> beginScissor, std::function<void()> endScissor) {
-    Rectangle textArea = GetTextArea();
-
-    drawRect(m_bounds, bgcolor);
-
-    Vector2 topLeft = { m_bounds.x, m_bounds.y };
-    Vector2 topRight = { m_bounds.x + m_bounds.width, m_bounds.y };
-    Vector2 bottomLeft = { m_bounds.x, m_bounds.y + m_bounds.height };
-    Vector2 bottomRight = { m_bounds.x + m_bounds.width, m_bounds.y + m_bounds.height };
-    Color borderColor = IsFocused() ? BLUE : DARKGRAY;
-    drawLine(topLeft, topRight, 1.0f, borderColor);
-    drawLine(topRight, bottomRight, 1.0f, borderColor);
-    drawLine(bottomRight, bottomLeft, 1.0f, borderColor);
-    drawLine(bottomLeft, topLeft, 1.0f, borderColor);
-
-    float textAreaWidth = m_showScrollbar ? m_bounds.width - m_scrollbarWidth : m_bounds.width;
-    beginScissor({ textArea.x, textArea.y, textArea.width, textArea.height });
-
-    if (m_cursorIndex != m_selectionAnchor) {
-        int start = std::min(m_cursorIndex, m_selectionAnchor);
-        int end = std::max(m_cursorIndex, m_selectionAnchor);
-        int p = start;
-        while (p < end) {
-            size_t nextNL = m_text.find('\n', p);
-            int lineEnd = (nextNL == std::string::npos || nextNL >= (size_t)end) ? end : (int)nextNL;
-
-            Vector2 posStart = GetPositionFromIndex(p);
-            float width = MeasureTextEx(m_font, m_text.substr(p, lineEnd - p).c_str(), m_fontSize, m_spacing).x;
-            if (width < 2.0f && lineEnd < (int)m_text.length() && m_text[lineEnd] == '\n') width = 8.0f;
-
-            if (posStart.y + m_lineHeight > m_bounds.y && posStart.y < m_bounds.y + m_bounds.height) {
-                drawRect({ posStart.x, posStart.y, width, m_lineHeight }, { 0, 120, 255, 100 });
-            }
-            p = lineEnd;
-            if (p < end && m_text[p] == '\n') p++;
-        }
-    }
-
-    int start = 0;
-    int lineCount = 0;
-    for (int i = 0; i <= (int)m_text.length(); i++) {
-        if (i == (int)m_text.length() || m_text[i] == '\n') {
-            std::string lineStr = m_text.substr(start, i - start);
-            Vector2 drawPos = {
-                textArea.x + m_scrollOffset.x,
-                textArea.y + m_scrollOffset.y + lineCount * m_lineHeight
-            };
-            if (drawPos.y + m_lineHeight > textArea.y && drawPos.y < textArea.y + textArea.height) {
-                drawText(lineStr.c_str(), drawPos, m_fontSize, m_spacing, textcolor);
-            }
-            lineCount++;
-            start = i + 1;
-        }
-    }
-
-    if (m_isFocused && ((int)(m_blinkTimer * 2) % 2 == 0)) {
-        Vector2 cPos = GetPositionFromIndex(m_cursorIndex);
-        drawLine({ cPos.x, cPos.y }, { cPos.x, cPos.y + m_lineHeight }, 2, RED);
-    }
-
-    endScissor();
-
-    if (m_showScrollbar) {
-        Rectangle scrollTrack = {
-            m_bounds.x + m_bounds.width - m_scrollbarWidth - 4,
-            m_bounds.y + 4,
-            m_scrollbarWidth - 2,
-            m_bounds.height - 8
-        };
-        drawRect(scrollTrack, { 45, 45, 45, 255 });
-
-        float thumbHeight = (scrollTrack.height / m_contentHeight) * scrollTrack.height;
-        if (thumbHeight < 20) thumbHeight = 20;
-        float scrollPercent = -m_scrollOffset.y / (m_contentHeight - m_bounds.height);
-        float thumbY = scrollTrack.y + (scrollTrack.height - thumbHeight) * scrollPercent;
-
-        Rectangle thumbRect = { scrollTrack.x + 1, thumbY, scrollTrack.width - 2, thumbHeight };
-        drawRect(thumbRect, m_isDraggingScroll ? DARKGRAY : GRAY);
-    }
-}

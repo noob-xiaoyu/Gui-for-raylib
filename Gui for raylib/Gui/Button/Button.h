@@ -17,7 +17,6 @@ public:
     Rectangle GetBounds() const override;
     void Update() override;
     void Draw() override;
-    void Draw(std::function<void(Rectangle, Color)> drawRect, std::function<void(Rectangle, Color, float)> drawBorder, std::function<void(const char*, Vector2, float, float, Color)> drawText);
 
     Vector2 GetPos() const;
     Vector2 GetSize() const;

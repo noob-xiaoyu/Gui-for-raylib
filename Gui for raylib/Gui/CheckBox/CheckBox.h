@@ -24,7 +24,6 @@ public:
     Rectangle GetBounds() const override;
     void Update() override;
     void Draw() override;
-    void Draw(std::function<void(Rectangle, Color)> drawRect, std::function<void(Vector2, Vector2, float, Color)> drawLine, std::function<void(const char*, Vector2, float, float, Color)> drawText);
 
     bool IsChecked() const;
     void SetChecked(bool checked);

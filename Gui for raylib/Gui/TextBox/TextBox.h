@@ -20,7 +20,6 @@ public:
     void Update() override;
     void Draw() override;
     void Draw(Color bgcolor, Color textcolor);
-    void Draw(Color bgcolor, Color textcolor, std::function<void(Rectangle, Color)> drawRect, std::function<void(Vector2, Vector2, float, Color)> drawLine, std::function<void(const char*, Vector2, float, float, Color)> drawText, std::function<void(Rectangle)> beginScissor, std::function<void()> endScissor);
 
     void SetText(const std::string& text);
     std::string GetText() const;
@@ -68,7 +67,6 @@ private:
 private:
     Rectangle m_bounds;
     std::string m_text;
-    bool m_isFocused;
 
     Font m_font;
     float m_fontSize;
